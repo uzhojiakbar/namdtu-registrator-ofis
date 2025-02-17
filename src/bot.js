@@ -1,12 +1,12 @@
 require('dotenv').config(); // .env fayldan token olish
-const { Telegraf, Markup, session } = require('telegraf');
+const {Telegraf, Markup, session} = require('telegraf');
 const db = require('./db/database');
 
 const bot = new Telegraf(process.env.BOT_TOKEN); // Bot tokeningizni yuklash
 
 // Sessiyani boshqarish (foydalanuvchi holatini saqlash)
 bot.use(session({
-    defaultSession: () => ({ state: null })
+    defaultSession: () => ({state: null})
 }));
 
 // Ro‘yxatdan o‘tish jarayoni uchun holat boshqaruvi
@@ -18,7 +18,9 @@ bot.start(async (ctx) => {
     ctx.session.state = null;
 
     // Foydalanuvchini ma'lumotlar bazasida qidiramiz
-    db.get(`SELECT * FROM users WHERE telegram_id = ?`, [chatId], (err, user) => {
+    db.get(`SELECT *
+            FROM users
+            WHERE telegram_id = ?`, [chatId], (err, user) => {
         if (err) {
             console.error(err.message);
             return ctx.reply("❌ Maʼlumotlar bazasida xatolik yuz berdi.");
@@ -46,6 +48,7 @@ bot.on("text", async (ctx) => {
 
     const chatId = ctx.chat.id; // Foydalanuvchini telegram_id sifatida ishlatamiz
     const userInput = ctx.message.text.trim();
+    const message = ctx.message.text.trim();
 
     switch (ctx.session.state) {
         // Ro‘yxatdan o‘tish jarayonining holati
@@ -73,7 +76,8 @@ bot.on("text", async (ctx) => {
 
             // Ma'lumotlarni bazaga saqlash
             db.run(
-                `INSERT INTO users (telegram_id, full_name, passport_id, username, phone) VALUES (?, ?, ?, ?, ?)`,
+                `INSERT INTO users (telegram_id, full_name, passport_id, username, phone)
+                 VALUES (?, ?, ?, ?, ?)`,
                 [chatId, ctx.session.fullName, ctx.session.passportId, username, userInput],
                 (err) => {
                     if (err) {
@@ -113,7 +117,11 @@ bot.on("text", async (ctx) => {
             }
 
             db.run(
-                `UPDATE users SET full_name = ?, passport_id = ?, phone = ? WHERE telegram_id = ?`,
+                `UPDATE users
+                 SET full_name = ?,
+                     passport_id = ?,
+                     phone = ?
+                 WHERE telegram_id = ?`,
                 [ctx.session.fullName, ctx.session.passportId, userInput, chatId],
                 (err) => {
                     if (err) {
@@ -134,21 +142,53 @@ bot.on("text", async (ctx) => {
                 return ctx.reply("❌ Kategoriya tanlanmagan. Avval bo'lim tanlang.");
             }
 
-            db.run(
-                `INSERT INTO requests (user_id, category, message) VALUES (?, ?, ?)`,
-                [chatId, ctx.session.category, userInput],
-                (err) => {
-                    if (err) {
-                        console.error("DB Insert Error:", err.message);
-                        return ctx.reply("❌ Murojaatingizni saqlashda xatolik yuz berdi.");
+            db.get(`SELECT *
+                    FROM users
+                    WHERE telegram_id = ?`, [chatId], (err, user) => {
+                if (err || !user) return ctx.reply("❌ Ro‘yxatdan o‘tmagan foydalanuvchi.");
+
+                console.log("user: ", user)
+                console.log("ctx.session.category: ", ctx.session.category)
+                db.run(
+                    `INSERT INTO requests (user_id, category, message)
+                     VALUES (?, ?, ?)`,
+                    [chatId, ctx.session.category, userInput],
+                    (err) => {
+                        if (err) return ctx.reply("❌ Xatolik yuz berdi.");
+
+                        // Adminni topish va unga murojaatni yuborish
+                        db.get(`SELECT *
+                                FROM users
+                                WHERE admin_role = ?
+                                  AND is_admin = 1`,
+                            [ctx.session.category], (err, admin) => {
+                                if (!err && admin) {
+                                    bot.telegram.sendMessage(admin.telegram_id,
+                                        `📩 <b>Yangi murojaat:</b>\n\n` +
+                                        `📂 <b>Kategoriya:</b> ${ctx.session.category}\n` +
+                                        `👤 <b>Foydalanuvchi:</b> ${user.full_name}\n` +
+                                        `🛂 <b>Passport ID:</b> ${user.passport_id}\n` +
+                                        `📱 <b>Telefon:</b> ${user.phone}\n` +
+                                        (user.username ? `🔗 <b>Telegram:</b> ${user.username}\n` : "") +
+                                        `\n<i>${message}</i>`,
+                                        {
+                                            parse_mode: "HTML",
+                                            ...Markup.inlineKeyboard([
+                                                [Markup.button.callback("✉️ Javob berish", `reply_to_${Number.parseInt(user.telegram_id)}_${admin.telegram_id}`)]
+                                            ])
+                                        }
+                                    );
+
+                                    ctx.session.state = null;
+                                    ctx.session.category = null;
+                                }
+                            });
+
+
+                        return ctx.reply("✅ Murojaatingiz muvaffaqiyatli yuborildi!", mainMenuMarkup());
                     }
-
-                    ctx.session.state = null;
-                    ctx.session.category = null;
-
-                    return ctx.reply("✅ Murojaatingiz muvaffaqiyatli yuborildi!", mainMenuMarkup());
-                }
-            );
+                );
+            });
             break;
         }
 
@@ -157,7 +197,8 @@ bot.on("text", async (ctx) => {
             const message = ctx.message.text.trim();
 
             db.run(
-                `INSERT INTO requests (user_id, category, message, is_anonymous) VALUES (?, ?, ?, ?)`,
+                `INSERT INTO requests (user_id, category, message, is_anonymous)
+                 VALUES (?, ?, ?, ?)`,
                 [chatId, 'Anonim', message, 1], // Foydalanuvchi ID sifatida telegram_id
                 (err) => {
                     if (err) {
@@ -172,25 +213,70 @@ bot.on("text", async (ctx) => {
             break;
         }
 
+        case "waiting_for_reply": {
+            const replyText = ctx.message.text.trim();
+            const userId = ctx.session.requestUserId;
+            console.log("ctx.session",ctx.session)
+            const adminId = ctx.session.adminId;
+
+            db.get(`SELECT * FROM users WHERE telegram_id = ?`, [adminId], (err, admin) => {
+                console.log("ADMIN",admin)
+                console.log("replyText",replyText)
+                console.log("userId",userId)
+                console.log("adminId",adminId)
+
+                if (err || !admin) return ctx.reply("❌ Admin topilmadi.");
+
+                bot.telegram.sendMessage(userId,
+                    `📩 <b>Admin javobi:</b>\n\n` +
+                    `👤 <b>Admin:</b> ${admin.full_name}\n` +
+                    `📱 <b>Telefon:</b> ${admin.phone}\n\n` +
+                    `<i>${replyText}</i>`,
+                    { parse_mode: "HTML" }
+                );
+
+                ctx.session.state = null;
+                ctx.session.requestUserId = null;
+                ctx.session.adminId = null;
+                return ctx.reply("✅ Javob foydalanuvchiga yuborildi!");
+            });
+            break
+        }
         default:
             return ctx.reply("❌ Xatolik yuz berdi. Iltimos, qayta urinib ko'ring.");
     }
 });
 
+bot.action(/reply_to_(\d+)_(\d+)/, (ctx) => {
+    ctx.session.state = "waiting_for_reply";
+    console.log("ctxctxctxctx",ctx)
+    ctx.session.requestUserId = parseInt(ctx.match[1]);
+    ctx.session.adminId = parseInt(ctx.match[2]);
+    return ctx.reply("✍️ Iltimos, foydalanuvchiga yuborish uchun javob matnini kiriting:");
+});
+
 
 // Kategoriya tugmasi bosilgandan keyin
 bot.action(/category_(.+)/, (ctx) => {
-    console.log("category",ctx.match.input)
+    console.log("category", ctx.match.input)
     const category = ctx.match[1]; // Tanlangan kategoriyani olish
     ctx.session.category = category; // Sessiyada kategoriya saqlanadi
     ctx.session.state = "waiting_for_message"; // Endi foydalanuvchi murojaat matnini kiritishi kerak
 
     let categoryName = "";
     switch (category) {
-        case "tech": categoryName = "Texnik muammo"; break;
-        case "study": categoryName = "O'quv masalalari"; break;
-        case "admin": categoryName = "Ma'muriy masalalar"; break;
-        case "other": categoryName = "Boshqa"; break;
+        case "tech":
+            categoryName = "Texnik muammo";
+            break;
+        case "study":
+            categoryName = "O'quv masalalari";
+            break;
+        case "admin":
+            categoryName = "Ma'muriy masalalar";
+            break;
+        case "other":
+            categoryName = "Boshqa";
+            break;
     }
 
     return ctx.reply(
@@ -228,7 +314,9 @@ bot.action("my_requests", (ctx) => {
     const chatId = ctx.chat.id;
 
     // Foydalanuvchini ma'lumotlar bazasidan topamiz
-    db.get(`SELECT id FROM users WHERE telegram_id = ?`, [chatId], (err, user) => {
+    db.get(`SELECT id
+            FROM users
+            WHERE telegram_id = ?`, [chatId], (err, user) => {
         if (err) {
             console.error(err.message);
             return ctx.reply("❌ Maʼlumotlar bazasida xatolik yuz berdi.");
@@ -239,7 +327,10 @@ bot.action("my_requests", (ctx) => {
         }
 
         // Foydalanuvchining murojaatlarini olib kelamiz
-        db.all(`SELECT category, message, created_at FROM requests WHERE user_id = ? ORDER BY created_at DESC`, [chatId], (err, requests) => {
+        db.all(`SELECT category, message, created_at
+                FROM requests
+                WHERE user_id = ?
+                ORDER BY created_at DESC`, [chatId], (err, requests) => {
             if (err) {
                 console.error(err.message);
                 return ctx.reply("❌ Maʼlumotlar bazasidan murojaatlarni olishda xatolik yuz berdi.");
@@ -281,9 +372,9 @@ function showRequest(ctx, requests, index) {
 
     // Xabarni jo'natish (yoki tahrirlash)
     if (ctx.update.callback_query) {
-        ctx.editMessageText(response, { parse_mode: "HTML", ...navigationButtons });
+        ctx.editMessageText(response, {parse_mode: "HTML", ...navigationButtons});
     } else {
-        ctx.reply(response, { parse_mode: "HTML", ...navigationButtons });
+        ctx.reply(response, {parse_mode: "HTML", ...navigationButtons});
     }
 }
 
@@ -293,7 +384,10 @@ bot.action(/request_prev_(\d+)/, (ctx) => {
     const chatId = ctx.chat.id;
 
     // Ma'lumotlar bazasidan murojaatlarni qayta olish
-    db.all(`SELECT category, message, created_at FROM requests WHERE user_id = ? ORDER BY created_at DESC`, [chatId], (err, requests) => {
+    db.all(`SELECT category, message, created_at
+            FROM requests
+            WHERE user_id = ?
+            ORDER BY created_at DESC`, [chatId], (err, requests) => {
         if (err) {
             console.error(err.message);
             return ctx.reply("❌ Maʼlumotlar bazasidan murojaatlarni olishda xatolik yuz berdi.");
@@ -309,7 +403,10 @@ bot.action(/request_next_(\d+)/, (ctx) => {
     const chatId = ctx.chat.id;
 
     // Ma'lumotlar bazasidan murojaatlarni qayta olish
-    db.all(`SELECT category, message, created_at FROM requests WHERE user_id = ? ORDER BY created_at DESC`, [chatId], (err, requests) => {
+    db.all(`SELECT category, message, created_at
+            FROM requests
+            WHERE user_id = ?
+            ORDER BY created_at DESC`, [chatId], (err, requests) => {
         if (err) {
             console.error(err.message);
             return ctx.reply("❌ Maʼlumotlar bazasidan murojaatlarni olishda xatolik yuz berdi.");
@@ -331,7 +428,9 @@ bot.action("about_me", (ctx) => {
 
     // Ma'lumotlar bazasidan foydalanuvchi ma'lumotlarini olish
     db.get(
-        `SELECT full_name, passport_id, phone, username FROM users WHERE telegram_id = ?`,
+        `SELECT full_name, passport_id, phone, username
+         FROM users
+         WHERE telegram_id = ?`,
         [chatId],
         (err, user) => {
             if (err) {
