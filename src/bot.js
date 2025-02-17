@@ -157,10 +157,29 @@ bot.on("text", async (ctx) => {
                         if (err) return ctx.reply("❌ Xatolik yuz berdi.");
 
                         // Adminni topish va unga murojaatni yuborish
-                        db.get(`SELECT * FROM users WHERE admin_role = ? AND is_admin = 1`,
-                            [ctx.session.category], (err, admin) => {
-                                if (!err && admin) {
-                                    bot.telegram.sendMessage(admin.telegram_id,
+                        db.all(
+                            `SELECT * FROM users WHERE admin_role = ? AND is_admin = 1`,
+                            [ctx.session.category],
+                            (err, admins) => {
+                                if (err) {
+                                    console.error("Database error:", err);
+                                    return;
+                                }
+
+                                if (admins.length === 0) {
+                                    console.log("No admins found for category:", ctx.session.category);
+                                    return;
+                                }
+
+                                admins.forEach(admin => {
+                                    const adminTelegramId = Number(admin.telegram_id);
+                                    if (!adminTelegramId) {
+                                        console.error("Invalid telegram_id:", admin.telegram_id);
+                                        return;
+                                    }
+
+                                    bot.telegram.sendMessage(
+                                        adminTelegramId,
                                         `📩 <b>Yangi murojaat:</b>\n\n` +
                                         `📂 <b>Kategoriya:</b> ${ctx.session.category}\n` +
                                         `👤 <b>Foydalanuvchi:</b> ${user.full_name}\n` +
@@ -171,16 +190,16 @@ bot.on("text", async (ctx) => {
                                         {
                                             parse_mode: "HTML",
                                             ...Markup.inlineKeyboard([
-                                                [Markup.button.callback("✉️ Javob berish", `reply_to_${Number.parseInt(user.telegram_id)}_${admin.telegram_id}`)]
+                                                [Markup.button.callback("✉️ Javob berish", `reply_to_${Number.parseInt(user.telegram_id)}_${adminTelegramId}`)]
                                             ])
                                         }
                                     );
+                                });
 
-                                    ctx.session.state = null;
-                                    ctx.session.category = null;
-                                }
-                            });
-
+                                ctx.session.state = null;
+                                ctx.session.category = null;
+                            }
+                        );
 
 
                         return ctx.reply("✅ Murojaatingiz muvaffaqiyatli yuborildi!", mainMenuMarkup());
