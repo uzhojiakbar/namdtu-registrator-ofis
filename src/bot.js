@@ -157,10 +157,7 @@ bot.on("text", async (ctx) => {
                         if (err) return ctx.reply("❌ Xatolik yuz berdi.");
 
                         // Adminni topish va unga murojaatni yuborish
-                        db.get(`SELECT *
-                                FROM users
-                                WHERE admin_role = ?
-                                  AND is_admin = 1`,
+                        db.get(`SELECT * FROM users WHERE admin_role = ? AND is_admin = 1`,
                             [ctx.session.category], (err, admin) => {
                                 if (!err && admin) {
                                     bot.telegram.sendMessage(admin.telegram_id,
@@ -183,6 +180,7 @@ bot.on("text", async (ctx) => {
                                     ctx.session.category = null;
                                 }
                             });
+
 
 
                         return ctx.reply("✅ Murojaatingiz muvaffaqiyatli yuborildi!", mainMenuMarkup());
@@ -258,24 +256,30 @@ bot.action(/reply_to_(\d+)_(\d+)/, (ctx) => {
 
 // Kategoriya tugmasi bosilgandan keyin
 bot.action(/category_(.+)/, (ctx) => {
-    console.log("category", ctx.match.input)
+    console.log("category", ctx.match.input);
     const category = ctx.match[1]; // Tanlangan kategoriyani olish
     ctx.session.category = category; // Sessiyada kategoriya saqlanadi
     ctx.session.state = "waiting_for_message"; // Endi foydalanuvchi murojaat matnini kiritishi kerak
 
     let categoryName = "";
     switch (category) {
-        case "tech":
-            categoryName = "Texnik muammo";
+        case "academic":
+            categoryName = "Akademik (O‘quv) faoliyati bo‘yicha xizmatlar";
             break;
-        case "study":
-            categoryName = "O'quv masalalari";
+        case "youth":
+            categoryName = "Yoshlar masalalari va ma’naviy-ma’rifiy faoliyat bo‘yicha xizmatlar";
             break;
-        case "admin":
-            categoryName = "Ma'muriy masalalar";
+        case "international":
+            categoryName = "Xalqaro aloqalar faoliyati bo‘yicha xizmatlar";
+            break;
+        case "finance":
+            categoryName = "Buxgalteriya, marketing va amaliyot faoliyati bo‘yicha xizmatlar";
+            break;
+        case "science":
+            categoryName = "Ilmiy faoliyat bo‘yicha xizmatlar";
             break;
         case "other":
-            categoryName = "Boshqa";
+            categoryName = "Ko‘rsatilishi zarur bo‘lgan boshqa qo‘shimcha xizmatlar";
             break;
     }
 
@@ -300,10 +304,12 @@ bot.action("new_request", (ctx) => {
     return ctx.reply(
         "📂 Iltimos, murojaatingiz uchun kategoriya tanlang:",
         Markup.inlineKeyboard([
-            [Markup.button.callback("🖥 Texnik muammo", "category_tech")],
-            [Markup.button.callback("📖 O'quv masalalari", "category_study")],
-            [Markup.button.callback("👨‍💼 Ma'muriy masalalar", "category_admin")],
-            [Markup.button.callback("❓ Boshqa", "category_other")]
+            [Markup.button.callback("📖 Akademik (O‘quv) faoliyati", "category_academic")],
+            [Markup.button.callback("👨‍🎓 Yoshlar masalalari", "category_youth")],
+            [Markup.button.callback("🌍 Xalqaro aloqalar", "category_international")],
+            [Markup.button.callback("💰 Buxgalteriya, marketing, amaliyot", "category_finance")],
+            [Markup.button.callback("🔬 Ilmiy faoliyat", "category_science")],
+            [Markup.button.callback("❓ Qo‘shimcha xizmatlar", "category_other")]
         ])
     );
 });
@@ -466,59 +472,7 @@ bot.action("update_info", (ctx) => {
     ctx.session.state = "updating_name"; // Yangilash jarayonini "ismni so'rash" qadamidan boshlaymiz
     return ctx.reply("📝 Iltimos, yangi to‘liq ismingizni kiriting:");
 });
-
-
 // Triggerni boshlash
 bot.launch()
     .then(() => console.log("🚀 Bot ishlayapti. No Problem BRO!"))
     .catch((err) => console.error("❌ Botni ishga tushirishda xatolik yuz berdi:", err));
-
-// // Yangi murojaat matni
-// bot.on("text", (ctx) => {
-//     if (ctx.session.state !== "waiting_for_message") return; // Faqat "waiting_for_message" holatida ishlaydi
-//
-//     const chatId = ctx.chat.id;
-//     const message = ctx.message.text.trim();
-//
-//     console.log("message",message)
-//
-//     // Tekshirish: kategoriya va davlat ma'lumotlari mavjudligini tekshiramiz
-//     if (!ctx.session.category) {
-//         ctx.session.state = null; // Sessiyani tozalaymiz
-//         return ctx.reply("❌ Kategoriya tanlanmagan. Iltimos, avval /start ni bosib boshlang.");
-//     }
-//
-//     // Foydalanuvchini ma'lumotlar bazasidan topamiz
-//     db.get(`SELECT id FROM users WHERE telegram_id = ?`, [chatId], (err, user) => {
-//         if (err) {
-//             // Ma'lumotlar bazasi xatosi (debug uchun)
-//             console.error("DB Error (get user id):", err.message);
-//             return ctx.reply("❌ Maʼlumotlar bazasida xatolik yuz berdi.");
-//         }
-//
-//         if (!user) {
-//             // Agar foydalanuvchi ro'yxatdan o'tmagan bo'lsa
-//             ctx.session.state = null; // Sessiyani tozalaymiz
-//             return ctx.reply("❌ Ro'yxatdan o'tish kerak. Iltimos, /start ni yuborib ro'yxatdan o'ting.");
-//         }
-//
-//         // Ma'lumotni "requests" jadvaliga qo'shamiz
-//         db.run(
-//             `INSERT INTO requests (user_id, category, message) VALUES (?, ?, ?)`,
-//             [user.id, ctx.session.category, message],
-//             (err) => {
-//                 if (err) {
-//                     // Ma'lumotlar bazasida yozayotganda xatolik (debug uchun)
-//                     console.error("DB Error (insert request):", err.message);
-//                     return ctx.reply("❌ Murojaatingizni saqlashda xatolik yuz berdi.");
-//                 }
-//
-//                 // Sessiyani tozalash va muvaffaqiyat haqida xabar berish
-//                 ctx.session.state = null;
-//                 ctx.session.category = null;
-//
-//                 return ctx.reply("✅ Murojaatingiz muvaffaqiyatli yuborildi!", mainMenuMarkup());
-//             }
-//         );
-//     });
-// });
