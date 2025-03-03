@@ -9,6 +9,48 @@ bot.use(session({
     defaultSession: () => ({state: null})
 }));
 
+const roleTranslation = (role) => {
+    if (role === 'academic') {
+        return "📖 Akademik (O‘quv) faoliyati"
+    } else if (role === 'youth') {
+        return "👨‍🎓 Yoshlar masalalari"
+    } else if (role === 'international') {
+        return "🌍 Xalqaro aloqalar"
+    } else if (role === 'finance') {
+        return "💰 Buxgalteriya, marketing, amaliyot"
+    } else if (role === 'science') {
+        return "🔬 Ilmiy faoliyat"
+    } else if (role === 'other') {
+        return "❓ Qo‘shimcha xizmatlar"
+    } else if (role === 'chief') {
+        return "🏆 ENG KATTA ADMIN"
+    } else {
+        return "Nomalum"
+    }
+}
+
+const roleTranslationCategory = (role) => {
+    role = role.replace("category_", ""); // "category_" qismini olib tashlash
+    if (role === 'academic') {
+        return "📖 Akademik (O‘quv) faoliyati"
+    } else if (role === 'youth') {
+        return "👨‍🎓 Yoshlar masalalari"
+    } else if (role === 'international') {
+        return "🌍 Xalqaro aloqalar"
+    } else if (role === 'finance') {
+        return "💰 Buxgalteriya, marketing, amaliyot"
+    } else if (role === 'science') {
+        return "🔬 Ilmiy faoliyat"
+    } else if (role === 'other') {
+        return "❓ Qo‘shimcha xizmatlar"
+    } else if (role === 'chief') {
+        return "🏆 ENG KATTA ADMIN"
+    } else {
+        return "Nomalum"
+    }
+}
+
+
 // Ro‘yxatdan o‘tish jarayoni uchun holat boshqaruvi
 // /start komandasi
 bot.start(async (ctx) => {
@@ -25,10 +67,18 @@ bot.start(async (ctx) => {
             console.error(err.message);
             return ctx.reply("❌ Maʼlumotlar bazasida xatolik yuz berdi.");
         }
-
+        console.log(user)
         if (user) {
-            // Foydalanuvchi ro'yxatdan o'tgan bo'lsa, asosiy menyuga qaytariladi
-            return ctx.reply("✅ Siz allaqachon ro'yxatdan o'tgansiz! Bosh menyuga o'tamiz...", mainMenuMarkup());
+            if (user?.role === "user") {
+                return ctx.reply("✅ *Hammasi tayyor* \n\n*Bosh menyu dasiz!*", mainMenuMarkup());
+            } else if (user?.role === "admin") {
+                return ctx.reply("> *✅ Salom Admin*\n\n*Sizning lavozimingiz*: _`" + (roleTranslation(user?.admin_role || "oth") || "Nomalum") + "`_", {
+                    parse_mode: "MarkdownV2",
+                    ...AdminMenu()
+                });
+            }
+
+
         }
 
         // Agar foydalanuvchi ro'yxatdan o'tmagan bo'lsa, ro'yxatdan o'tish jarayonini boshlaymiz
@@ -37,6 +87,10 @@ bot.start(async (ctx) => {
     });
 });
 
+const chiefs = [
+    2017025737,
+]
+// 1286152423
 // Matnli javoblarni boshqarish
 bot.on("text", async (ctx) => {
     console.log("Foydalanuvchi holati:", ctx.session.state); // Sessiya holati nazorati
@@ -57,7 +111,6 @@ bot.on("text", async (ctx) => {
             ctx.session.state = "waiting_for_passport"; // Keyingi bosqichga o'tiladi
             return ctx.reply("🛂 Iltimos, Passport ID yuboring (format: AB1234567):");
         }
-
         case "waiting_for_passport": {
             if (!/^[A-Z]{2}\d{7}$/.test(userInput)) {
                 return ctx.reply("❌ Passport ID noto‘g‘ri. Format: AB1234567.");
@@ -66,7 +119,6 @@ bot.on("text", async (ctx) => {
             ctx.session.state = "waiting_for_phone"; // Telefon raqami bosqichiga o'tamiz
             return ctx.reply("📱 Iltimos, telefon raqamingizni kiritib yuboring (+99890-000-00-00):");
         }
-
         case "waiting_for_phone": {
             if (!/^\+998\d{2}-\d{3}-\d{2}-\d{2}$/.test(userInput)) {
                 return ctx.reply("❌ Telefon raqam noto‘g‘ri. Format: +99890-000-00-00.");
@@ -94,14 +146,12 @@ bot.on("text", async (ctx) => {
             );
             break;
         }
-
         // Ma'lumotni yangilash
         case "updating_name": {
             ctx.session.fullName = userInput; // Yangi ism saqlanadi
             ctx.session.state = "updating_passport"; // Keyingi qadam
             return ctx.reply("🛂 Iltimos, yangi Passport ID ni kiriting (format: AB1234567):");
         }
-
         case "updating_passport": {
             if (!/^[A-Z]{2}\d{7}$/.test(userInput)) {
                 return ctx.reply("❌ Passport ID noto‘g‘ri. Format: AB1234567.");
@@ -110,7 +160,6 @@ bot.on("text", async (ctx) => {
             ctx.session.state = "updating_phone"; // Telefonni yangilash bosqichi
             return ctx.reply("📱 Yangi telefon raqamingizni kiriting (+99890-000-00-00):");
         }
-
         case "updating_phone": {
             if (!/^\+998\d{2}-\d{3}-\d{2}-\d{2}$/.test(userInput)) {
                 return ctx.reply("❌ Telefon raqami noto‘g‘ri. Format: +99890-000-00-00.");
@@ -118,9 +167,9 @@ bot.on("text", async (ctx) => {
 
             db.run(
                 `UPDATE users
-                 SET full_name = ?,
+                 SET full_name   = ?,
                      passport_id = ?,
-                     phone = ?
+                     phone       = ?
                  WHERE telegram_id = ?`,
                 [ctx.session.fullName, ctx.session.passportId, userInput, chatId],
                 (err) => {
@@ -134,7 +183,6 @@ bot.on("text", async (ctx) => {
             );
             break;
         }
-
         // Yangi murojaat qilish bo‘yicha holat
         case "waiting_for_message": {
             if (!ctx.session.category) {
@@ -149,66 +197,133 @@ bot.on("text", async (ctx) => {
 
                 console.log("user: ", user)
                 console.log("ctx.session.category: ", ctx.session.category)
-                db.run(
-                    `INSERT INTO requests (user_id, category, message)
-                     VALUES (?, ?, ?)`,
-                    [chatId, ctx.session.category, userInput],
-                    (err) => {
-                        if (err) return ctx.reply("❌ Xatolik yuz berdi.");
+                db.get(
+                    `SELECT *
+                     FROM requests
+                     WHERE user_id = ?
+                       AND javob = 0`,
+                    [chatId],
+                    (err, request) => {
+                        if (err) {
+                            console.error("Error checking request:", err);
+                            return ctx.reply("❌ Murojaatni tekshirishda xatolik yuz berdi.");
+                        }
 
-                        // Adminni topish va unga murojaatni yuborish
-                        db.all(
-                            `SELECT * FROM users WHERE admin_role = ? AND is_admin = 1`,
-                            [ctx.session.category],
-                            (err, admins) => {
+                        if (request) {
+                            return ctx.reply("Sizda hali javob berilmagan so'rov bor. Iltimos javob kelguncha kuting.");
+                        }
+                        db.run(
+                            `INSERT INTO requests (user_id, category, message)
+                             VALUES (?, ?, ?)`,
+                            [chatId, ctx.session.category, userInput],
+                            (err) => {
                                 if (err) {
-                                    console.error("Database error:", err);
-                                    return;
+                                    console.log(err)
+                                    return ctx.reply("❌ Xatolik yuz berdi.")
                                 }
+                                ;
 
-                                if (admins.length === 0) {
-                                    console.log("No admins found for category:", ctx.session.category);
-                                    return;
-                                }
-
-                                admins.forEach(admin => {
-                                    const adminTelegramId = Number(admin.telegram_id);
-                                    if (!adminTelegramId) {
-                                        console.error("Invalid telegram_id:", admin.telegram_id);
-                                        return;
-                                    }
-
-                                    bot.telegram.sendMessage(
-                                        adminTelegramId,
-                                        `📩 <b>Yangi murojaat:</b>\n\n` +
-                                        `📂 <b>Kategoriya:</b> ${ctx.session.category}\n` +
-                                        `👤 <b>Foydalanuvchi:</b> ${user.full_name}\n` +
-                                        `🛂 <b>Passport ID:</b> ${user.passport_id}\n` +
-                                        `📱 <b>Telefon:</b> ${user.phone}\n` +
-                                        (user.username ? `🔗 <b>Telegram:</b> ${user.username}\n` : "") +
-                                        `\n<i>${message}</i>`,
-                                        {
-                                            parse_mode: "HTML",
-                                            ...Markup.inlineKeyboard([
-                                                [Markup.button.callback("✉️ Javob berish", `reply_to_${Number.parseInt(user.telegram_id)}_${adminTelegramId}`)]
-                                            ])
+                                // Adminni topish va unga murojaatni yuborish
+                                db.all(
+                                    `SELECT *
+                                     FROM users
+                                     WHERE admin_role = ?
+                                       AND is_admin = 1`,
+                                    [ctx.session.category],
+                                    (err, admins) => {
+                                        if (err) {
+                                            console.error("Database error:", err);
+                                            return;
                                         }
-                                    );
-                                });
 
-                                ctx.session.state = null;
-                                ctx.session.category = null;
+                                        if (admins.length === 0) {
+                                            console.log("No admins found for category:", ctx.session.category);
+
+                                            chiefs.map((id) => {
+                                                bot.telegram.sendMessage(
+                                                    id,
+                                                    `❗️ ${roleTranslationCategory(ctx.session.category)} bo'limda hech qanday admin topilmagani va bu xolat xavfli xolatligi uchun ushbu habar sizga yuborildii!\n\n\n\n` +
+                                                    `📩 <b>Yangi murojaat:</b>\n\n` +
+                                                    `📂 <b>Kategoriya:</b> ${roleTranslation(ctx.session.category)}\n` +
+                                                    `👤 <b>Foydalanuvchi:</b> ${user.full_name}\n` +
+                                                    `🛂 <b>Passport ID:</b> ${user.passport_id}\n` +
+                                                    `📱 <b>Telefon:</b> ${user.phone}\n` +
+                                                    (user.username ? `🔗 <b>Telegram:</b> ${user.username}\n` : "") +
+                                                    `\n<i>${message}</i>`,
+                                                    {
+                                                        parse_mode: "HTML",
+                                                        ...Markup.inlineKeyboard([
+                                                            [Markup.button.callback("✉️ Javob berish", `reply_to_${Number.parseInt(user.telegram_id)}_${id}`)],
+                                                            [Markup.button.callback("⚙️ Admin qilish", `admin_id_${Number.parseInt(user.telegram_id)}_category_${ctx.session.category.replace("category_", "")}`)]
+                                                        ])
+                                                    }
+                                                );
+                                            })
+                                            return;
+                                        }
+
+                                        admins.forEach(admin => {
+                                            const adminTelegramId = Number(admin.telegram_id);
+                                            if (!adminTelegramId) {
+                                                console.error("Invalid telegram_id:", admin.telegram_id);
+                                                return;
+                                            }
+                                            const chiefsSet = new Set(chiefs);
+                                            console.log("CHIEFS", chiefsSet.has(adminTelegramId))
+                                            console.log("adminTelegramId", adminTelegramId)
+                                            console.log("admins", admins)
+                                            if (chiefs.includes(adminTelegramId.toString())) {
+                                                bot.telegram.sendMessage(
+                                                    adminTelegramId,
+                                                    `📩 <b>Yangi murojaat:</b>\n\n` +
+                                                    `📂 <b>Kategoriya:</b> ${roleTranslation(ctx.session.category)}\n` +
+                                                    `👤 <b>Foydalanuvchi:</b> ${user.full_name}\n` +
+                                                    `🛂 <b>Passport ID:</b> ${user.passport_id}\n` +
+                                                    `📱 <b>Telefon:</b> ${user.phone}\n` +
+                                                    (user.username ? `🔗 <b>Telegram:</b> ${user.username}\n` : "") +
+                                                    `\n<i>${message}</i>`,
+                                                    {
+                                                        parse_mode: "HTML",
+                                                        ...Markup.inlineKeyboard([
+                                                                [Markup.button.callback("✉️ Javob berish", `reply_to_${Number.parseInt(user.telegram_id)}_${adminTelegramId}`)]
+                                                            ],
+                                                            [Markup.button.callback("⚙️ Admin qilish", `admin_id_${Number.parseInt(user.telegram_id)}_category_${ctx.session.category.replace("category_", "")}`)]
+                                                        )
+                                                    }
+                                                );
+                                            } else {
+                                                bot.telegram.sendMessage(
+                                                    adminTelegramId,
+                                                    `📩 <b>Yangi murojaat:</b>\n\n` +
+                                                    `📂 <b>Kategoriya:</b> ${roleTranslation(ctx.session.category)}\n` +
+                                                    `👤 <b>Foydalanuvchi:</b> ${user.full_name}\n` +
+                                                    `🛂 <b>Passport ID:</b> ${user.passport_id}\n` +
+                                                    `📱 <b>Telefon:</b> ${user.phone}\n` +
+                                                    (user.username ? `🔗 <b>Telegram:</b> ${user.username}\n` : "") +
+                                                    `\n<i>${message}</i>`,
+                                                    {
+                                                        parse_mode: "HTML",
+                                                        ...Markup.inlineKeyboard([
+                                                                [Markup.button.callback("✉️ Javob berish", `reply_to_${Number.parseInt(user.telegram_id)}_${adminTelegramId}_${ctx.session.category}`)]
+                                                            ]
+                                                        )
+                                                    }
+                                                );
+                                            }
+
+                                        });
+
+                                        ctx.session.state = null;
+                                        ctx.session.category = null
+                                    }
+                                );
+                                return ctx.reply("✅ Murojaatingiz muvaffaqiyatli yuborildi!", mainMenuMarkup());
                             }
                         );
-
-
-                        return ctx.reply("✅ Murojaatingiz muvaffaqiyatli yuborildi!", mainMenuMarkup());
-                    }
-                );
+                    });
             });
             break;
         }
-
         // Anonim murojaatlar uchun holat
         case "waiting_for_anonymous_message": {
             const message = ctx.message.text.trim();
@@ -229,34 +344,67 @@ bot.on("text", async (ctx) => {
             );
             break;
         }
-
         case "waiting_for_reply": {
             const replyText = ctx.message.text.trim();
             const userId = ctx.session.requestUserId;
-            console.log("ctx.session",ctx.session)
+
+            console.log("USERID", userId)
+            console.log("ctx.session", ctx.session)
             const adminId = ctx.session.adminId;
+            db.get(
+                `SELECT *
+                 FROM requests
+                 WHERE user_id = ?
+                   AND javob = 0`,
+                [userId],
+                (err, request) => {
+                    if (err) {
+                        console.error("Error checking request:", err);
+                        return ctx.reply("❌ Murojaatni tekshirishda xatolik yuz berdi.");
+                    }
 
-            db.get(`SELECT * FROM users WHERE telegram_id = ?`, [adminId], (err, admin) => {
-                console.log("ADMIN",admin)
-                console.log("replyText",replyText)
-                console.log("userId",userId)
-                console.log("adminId",adminId)
+                    console.log("request", request)
+                    if (!request) {
+                        return ctx.reply("❌ Javob berish uchun murojaat topilmadi yoki allaqachon javob berilgan.");
+                    }
 
-                if (err || !admin) return ctx.reply("❌ Admin topilmadi.");
+                    // Agar so'rov topilsa, javobni yangilash
+                    db.run(
+                        `UPDATE requests
+                         SET javob = 1,
+                             reply_text = ?
+                         WHERE user_id = ?
+                           AND javob = 0`,
+                        [replyText, userId],
+                        function (err) {
+                            if (err) {
+                                console.error("Error updating request:", err);
+                                return ctx.reply("❌ Javob yuborishda xatolik yuz berdi.");
+                            }
 
-                bot.telegram.sendMessage(userId,
-                    `📩 <b>Admin javobi:</b>\n\n` +
-                    `👤 <b>Admin:</b> ${admin.full_name}\n` +
-                    `📱 <b>Telefon:</b> ${admin.phone}\n\n` +
-                    `<i>${replyText}</i>`,
-                    { parse_mode: "HTML" }
-                );
+                            // Javob yuborish
+                            db.get(`SELECT *
+                                    FROM users
+                                    WHERE telegram_id = ?`, [adminId], (err, admin) => {
+                                if (err || !admin) return ctx.reply("❌ Admin topilmadi.");
 
-                ctx.session.state = null;
-                ctx.session.requestUserId = null;
-                ctx.session.adminId = null;
-                return ctx.reply("✅ Javob foydalanuvchiga yuborildi!");
-            });
+                                bot.telegram.sendMessage(userId,
+                                    `📩 <b>Admin javobi:</b>\n\n` +
+                                    `👤 <b>Admin:</b> ${admin.full_name}\n` +
+                                    `📱 <b>Telefon:</b> ${admin.phone}\n\n` +
+                                    `<i>${replyText}</i>`,
+                                    {parse_mode: "HTML"}
+                                );
+
+                                ctx.session.state = null;
+                                ctx.session.requestUserId = null;
+                                ctx.session.adminId = null;
+                                return ctx.reply("✅ Javob foydalanuvchiga yuborildi!");
+                            });
+                        }
+                    );
+                }
+            );
             break
         }
         default:
@@ -266,12 +414,78 @@ bot.on("text", async (ctx) => {
 
 bot.action(/reply_to_(\d+)_(\d+)/, (ctx) => {
     ctx.session.state = "waiting_for_reply";
-    console.log("ctxctxctxctx",ctx)
     ctx.session.requestUserId = parseInt(ctx.match[1]);
     ctx.session.adminId = parseInt(ctx.match[2]);
+    ctx.session.categoryRe = ctx.match[3];
     return ctx.reply("✍️ Iltimos, foydalanuvchiga yuborish uchun javob matnini kiriting:");
 });
 
+
+// Admin qilish tugmasini bosganda ishlovchi function
+bot.action(/admin_id_(\d+)_category_(\w+)/, async (ctx) => {
+    const userId = parseInt(ctx.match[1]); // Foydalanuvchi ID'si
+    const category = ctx.match[2]; // Kategoriya
+
+    // Session holatini o'rnatish
+    ctx.session.state = "waiting_for_admin_action";
+    console.log("Admin qilish jarayoni", ctx);
+
+    ctx.session.requestUserId = userId;
+    ctx.session.category = category;
+
+    db.each("SELECT * FROM users where telegram_id = ?", [userId], (err, row) => {
+        if (err) {
+            console.error(err);
+        } else {
+            if (!row) {
+                return ctx.reply("Foydalanuvchi topilmadi.");
+            }
+
+            return ctx.reply(
+                `⚙️ Admin qilish uchun: \n\n` +
+                `👤 Foydalanuvchi: ${row.full_name}\n` +
+                `📂 Kategoriya: ${roleTranslation(category)}\n` +
+                `Iltimos, admin qilishni tasdiqlang.`,
+                Markup.inlineKeyboard([
+                    [Markup.button.callback("✅ Tasdiqlash", `confirm_admin_${userId}_${category}`)],
+                    [Markup.button.callback("❌ Bekor qilish", `cancel_admin_${userId}`)]
+                ])
+            );
+        }
+    });
+});
+
+// Admin qilishni tasdiqlash yoki bekor qilish
+bot.action(/confirm_admin_(\d+)_(\w+)/, async (ctx) => {
+    const userId = parseInt(ctx.match[1]); // Foydalanuvchi ID
+    const category = ctx.match[2]; // Kategoriya
+    await makeUserAdmin(userId, category); // Admin qilish funksiyasi
+    await ctx.telegram.sendMessage(userId, `⚙️ Siz ushbu bo'limga admin qilindiz: \n${roleTranslation(category)}`);
+    await ctx.reply(`⚙️ ${userId} admin qilindi, kategoriya: \n${roleTranslation(category)}`);
+});
+
+// Admin qilishni bekor qilish
+bot.action(/cancel_admin_(\d+)/, async (ctx) => {
+    await ctx.reply(`Bekor qilindi`);
+});
+
+// Admin qilishni amalga oshiruvchi funksiya
+async function makeUserAdmin(userId, category) {
+    const updateQuery = `UPDATE users
+                         SET is_admin   = 1,
+                             role       = 'admin',
+                             admin_role = ?
+                         WHERE telegram_id = ?`;
+
+    db.run(updateQuery, [category, userId], function (err) {
+        if (err) {
+            console.log(`Xatolik yuz berdi: ${err.message}`);
+        } else if (this.changes === 0) {
+            console.log("Foydalanuvchi topilmadi.");
+        }
+    });
+
+}
 
 // Kategoriya tugmasi bosilgandan keyin
 bot.action(/category_(.+)/, (ctx) => {
@@ -307,15 +521,20 @@ bot.action(/category_(.+)/, (ctx) => {
     );
 });
 
-// Matnli javoblarni boshqarish
 const mainMenuMarkup = () => {
     return Markup.inlineKeyboard([
         [Markup.button.callback("🆕 Yangi murojaat", "new_request")],
         [Markup.button.callback("📜 Mening murojaatlarim", "my_requests")],
-        [Markup.button.callback("🤐 Anonim murojaat", "anonymous_request")],
         [Markup.button.callback("ℹ️ Men haqimda", "about_me")]
     ]);
 };
+
+const AdminMenu = () => {
+    return Markup.inlineKeyboard([
+        [Markup.button.callback("ℹ️ Men haqimda", "about_me")]
+    ]);
+};
+
 
 // "Yangi murojaat" tugmasi uchun action
 bot.action("new_request", (ctx) => {
@@ -341,7 +560,7 @@ bot.action("my_requests", (ctx) => {
     // Foydalanuvchini ma'lumotlar bazasidan topamiz
     db.get(`SELECT id
             FROM users
-            WHERE telegram_id = ?`, [chatId], (err, user) => {
+            WHERE telegram_id = ?`, [Number.parseInt(chatId)], (err, user) => {
         if (err) {
             console.error(err.message);
             return ctx.reply("❌ Maʼlumotlar bazasida xatolik yuz berdi.");
@@ -486,12 +705,12 @@ bot.action("about_me", (ctx) => {
         }
     );
 });
-
 bot.action("update_info", (ctx) => {
     ctx.session.state = "updating_name"; // Yangilash jarayonini "ismni so'rash" qadamidan boshlaymiz
     return ctx.reply("📝 Iltimos, yangi to‘liq ismingizni kiriting:");
 });
 // Triggerni boshlash
+
 bot.launch()
     .then(() => console.log("🚀 Bot ishlayapti. No Problem BRO!"))
     .catch((err) => console.error("❌ Botni ishga tushirishda xatolik yuz berdi:", err));
