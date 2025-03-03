@@ -89,8 +89,8 @@ bot.start(async (ctx) => {
 
 const chiefs = [
     2017025737,
+    1286152423
 ]
-// 1286152423
 // Matnli javoblarni boshqarish
 bot.on("text", async (ctx) => {
     console.log("Foydalanuvchi holati:", ctx.session.state); // Sessiya holati nazorati
@@ -371,7 +371,7 @@ bot.on("text", async (ctx) => {
                     // Agar so'rov topilsa, javobni yangilash
                     db.run(
                         `UPDATE requests
-                         SET javob = 1,
+                         SET javob      = 1,
                              reply_text = ?
                          WHERE user_id = ?
                            AND javob = 0`,
