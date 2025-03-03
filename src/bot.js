@@ -272,7 +272,6 @@ bot.on("text", async (ctx) => {
                                             console.log("CHIEFS", chiefsSet.has(adminTelegramId))
                                             console.log("adminTelegramId", adminTelegramId)
                                             console.log("admins", admins)
-                                            if (chiefs.includes(adminTelegramId.toString())) {
                                                 bot.telegram.sendMessage(
                                                     adminTelegramId,
                                                     `📩 <b>Yangi murojaat:</b>\n\n` +
@@ -286,32 +285,33 @@ bot.on("text", async (ctx) => {
                                                         parse_mode: "HTML",
                                                         ...Markup.inlineKeyboard([
                                                                 [Markup.button.callback("✉️ Javob berish", `reply_to_${Number.parseInt(user.telegram_id)}_${adminTelegramId}`)]
-                                                            ],
-                                                            [Markup.button.callback("⚙️ Admin qilish", `admin_id_${Number.parseInt(user.telegram_id)}_category_${ctx.session.category.replace("category_", "")}`)]
-                                                        )
-                                                    }
-                                                );
-                                            } else {
-                                                bot.telegram.sendMessage(
-                                                    adminTelegramId,
-                                                    `📩 <b>Yangi murojaat:</b>\n\n` +
-                                                    `📂 <b>Kategoriya:</b> ${roleTranslation(ctx.session.category)}\n` +
-                                                    `👤 <b>Foydalanuvchi:</b> ${user.full_name}\n` +
-                                                    `🛂 <b>Passport ID:</b> ${user.passport_id}\n` +
-                                                    `📱 <b>Telefon:</b> ${user.phone}\n` +
-                                                    (user.username ? `🔗 <b>Telegram:</b> ${user.username}\n` : "") +
-                                                    `\n<i>${message}</i>`,
-                                                    {
-                                                        parse_mode: "HTML",
-                                                        ...Markup.inlineKeyboard([
-                                                                [Markup.button.callback("✉️ Javob berish", `reply_to_${Number.parseInt(user.telegram_id)}_${adminTelegramId}_${ctx.session.category}`)]
                                                             ]
                                                         )
                                                     }
                                                 );
-                                            }
-
                                         });
+
+                                        chiefs.map((id) => {
+                                            bot.telegram.sendMessage(
+                                                id,
+                                                `❗️ USHBU HABAR SIZ CHIEF BO'LGANINGIZ UCHUN KO'RINMOQDA !\n\n\n\n` +
+                                                `📩 <b>Yangi murojaat:</b>\n\n` +
+                                                `📂 <b>Kategoriya:</b> ${roleTranslation(ctx.session.category)}\n` +
+                                                `👤 <b>Foydalanuvchi:</b> ${user.full_name}\n` +
+                                                `🛂 <b>Passport ID:</b> ${user.passport_id}\n` +
+                                                `📱 <b>Telefon:</b> ${user.phone}\n` +
+                                                (user.username ? `🔗 <b>Telegram:</b> ${user.username}\n` : "") +
+                                                `\n<i>${message}</i>`,
+                                                {
+                                                    parse_mode: "HTML",
+                                                    ...Markup.inlineKeyboard([
+                                                        [Markup.button.callback("✉️ Javob berish", `reply_to_${Number.parseInt(user.telegram_id)}_${id}`)],
+                                                        [Markup.button.callback("⚙️ Admin qilish", `admin_id_${Number.parseInt(user.telegram_id)}_category_${ctx.session.category.replace("category_", "")}`)]
+                                                    ])
+                                                }
+                                            );
+                                        })
+
 
                                         ctx.session.state = null;
                                         ctx.session.category = null
