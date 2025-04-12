@@ -89,7 +89,8 @@ bot.start(async (ctx) => {
 
 const chiefs = [
     2017025737,
-    1286152423
+    1286152423,
+    449624551,
 ]
 // Matnli javoblarni boshqarish
 bot.on("text", async (ctx) => {
