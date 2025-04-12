@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="uz">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>So‘rovlar Statistikasi</title>
+    <style>
+      body {
+        font-family: "Segoe UI", sans-serif;
+        background: #f4f6f9;
+        margin: 0;
+        padding: 10px;
+        color: #333;
+      }
+      h1 {
+        text-align: center;
+        margin-bottom: 20px;
+      }
+      .filters {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+      input[type="date"],
+      button {
+        padding: 8px;
+        font-size: 14px;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+      }
+      button {
+        background: #4caf50;
+        color: white;
+        cursor: pointer;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+        overflow-x: auto;
+        display: block;
+      }
+      th,
+      td {
+        border: 1px solid #ccc;
+        padding: 8px;
+        text-align: left;
+        max-width: 200px;
+        white-space: normal;
+        word-wrap: break-word;
+      }
+      th {
+        background-color: #eaeaea;
+      }
+      .section-title {
+        font-weight: bold;
+        margin-top: 20px;
+        font-size: 18px;
+      }
+      @media (max-width: 768px) {
+        table,
+        thead,
+        tbody,
+        th,
+        td,
+        tr {
+          font-size: 12px;
+        }
+        .filters {
+          flex-direction: column;
+          align-items: center;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>So‘rovlar Statistikasi</h1>
+    <div class="filters">
+      <label>Sana dan: <input type="date" id="startDate" /></label>
+      <label>gacha: <input type="date" id="endDate" /></label>
+      <button onclick="renderFilteredData()">Ko'rsatish</button>
+    </div>
+
+    <div id="categoryStats"></div>
+    <div id="requestDetails"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/sql.js@1.8.0/dist/sql-wasm.js"></script>
+    <script>
+      let db;
+
+      const roleTranslation = (role) => {
+        if (role === "academic") return "📖 Akademik (O‘quv) faoliyati";
+        else if (role === "youth") return "👨‍🎓 Yoshlar masalalari";
+        else if (role === "international") return "🌍 Xalqaro aloqalar";
+        else if (role === "finance")
+          return "💰 Buxgalteriya, marketing, amaliyot";
+        else if (role === "science") return "🔬 Ilmiy faoliyat";
+        else if (role === "other") return "❓ Qo‘shimcha xizmatlar";
+        else if (role === "chief") return "🏆 ENG KATTA ADMIN";
+        else return "Nomalum";
+      };
+
+      initSqlJs({
+        locateFile: (file) =>
+          `https://cdn.jsdelivr.net/npm/sql.js@1.8.0/dist/${file}`,
+      }).then(async (SQL) => {
+        const response = await fetch("../bot.db");
+        const buffer = await response.arrayBuffer();
+        db = new SQL.Database(new Uint8Array(buffer));
+        renderFilteredData();
+      });
+
+      function renderFilteredData() {
+        const start =
+          document.getElementById("startDate").value || "1900-01-01";
+        const end = document.getElementById("endDate").value || "2999-12-31";
+
+        const categoryRes = db.exec(`
+          SELECT category, COUNT(*) as count
+          FROM requests
+          WHERE DATE(created_at) BETWEEN '${start}' AND '${end}'
+          GROUP BY category;
+        `);
+
+        const detailsRes = db.exec(`
+          SELECT 
+  r.id, 
+  u.full_name, 
+  u.phone, 
+  u.passport_id, 
+  r.category, 
+  r.created_at, 
+  r.message, 
+  r.javob, 
+  r.reply_text
+FROM requests r
+LEFT JOIN users u ON r.user_id = u.telegram_id
+WHERE DATE(r.created_at) BETWEEN '${start}' AND '${end}'
+ORDER BY r.created_at DESC;
+
+        `);
+
+        console.log(categoryRes);
+        console.log(detailsRes);
+
+        const categoryDiv = document.getElementById("categoryStats");
+        categoryDiv.innerHTML =
+          '<div class="section-title">Kategoriyalar bo‘yicha so‘rovlar soni</div>';
+
+        if (categoryRes.length) {
+          const table = document.createElement("table");
+          table.innerHTML = `<tr><th>Kategoriya</th><th>So‘rovlar soni</th></tr>`;
+          categoryRes[0].values.forEach(([category, count]) => {
+            table.innerHTML += `<tr><td>${roleTranslation(
+              category
+            )}</td><td>${count}</td></tr>`;
+          });
+          categoryDiv.appendChild(table);
+        } else {
+          categoryDiv.innerHTML += "<p>Ma‘lumot topilmadi</p>";
+        }
+
+        const detailsDiv = document.getElementById("requestDetails");
+        detailsDiv.innerHTML =
+          '<div class="section-title">So‘rov tafsilotlari</div>';
+
+        if (detailsRes.length) {
+          const table = document.createElement("table");
+          table.innerHTML = `<tr>
+            <th>ID</th>
+            <th>Ism Familiya</th>
+            <th>Telefon</th>
+            <th>Pasport ID</th>
+            <th>Kategoriya</th>
+            <th>Yuborilgan</th>
+            <th>Xabar</th>
+            <th>Javob</th>
+            <th>Javob matni</th>
+          </tr>`;
+
+          detailsRes[0].values.forEach((row) => {
+            const [
+              id,
+              name,
+              phone,
+              passport,
+              category,
+              created,
+              msg,
+              javob,
+              reply,
+            ] = row;
+            table.innerHTML += `<tr>
+              <td>${id}</td>
+              <td>${name || ""}</td>
+              <td>${phone || ""}</td>
+              <td>${passport || ""}</td>
+              <td>${roleTranslation(category)}</td>
+              <td>${created}</td>
+              <td>${msg}</td>
+              <td>${javob ? "Ha" : "Yo'q"}</td>
+              <td>${reply || ""}</td>
+            </tr>`;
+          });
+          detailsDiv.appendChild(table);
+        } else {
+          detailsDiv.innerHTML += "<p>So‘rovlar topilmadi</p>";
+        }
+      }
+    </script>
+  </body>
+</html>
